@@ -235,7 +235,6 @@ namespace YelpAPI
         {
             try
             {
-                MapAPI.getCordinate("上尾");
                 List<CoreTweet.Status> replies =  SingleService.getOAuthAndReplies();
                 SearchRestAndReply(replies[0]);
 
