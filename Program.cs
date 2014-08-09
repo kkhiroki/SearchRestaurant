@@ -89,13 +89,18 @@ namespace YelpAPI
                 queryParams = new Dictionary<string, string>();
             }
 
+
+            string queryStr = null;
             foreach (var queryParam in queryParams)
             {
-                query[queryParam.Key] = SimpleOAuth.Utilities.UrlHelper.Encode(queryParam.Value);
+                string key = queryParam.Key;
+                string value = queryParam.Value;
+                queryStr += key + "=" +value + "&";
             }
 
             var uriBuilder = new UriBuilder(baseURL);
-            uriBuilder.Query = query.ToString();
+            uriBuilder.Query = queryStr;
+
 
             var request = WebRequest.Create(uriBuilder.ToString());
             request.Method = "GET";
@@ -124,6 +129,7 @@ namespace YelpAPI
         public JObject Search(string term, string location)
         {
             string baseURL = API_HOST + SEARCH_PATH;
+            Encoding enc = Encoding.Unicode;
             var queryParams = new Dictionary<string, string>()
             {
                 //{ "country_code", "JP" },
@@ -182,7 +188,7 @@ namespace YelpAPI
         /// </summary>
         /// <param name="term">The search term to query.</param>
         /// <param name="location">The location of the business to query.</param>
-        public static void QueryAPIAndPrintResult(PairOfLocTerm reply, string term, string location)
+        public static List<string> QueryAPIAndPrintResult(string term, string location)
         {
             var client = new YelpAPIClient();
 
@@ -192,36 +198,34 @@ namespace YelpAPI
 
             JArray businesses = (JArray)response.GetValue("businesses");
 
+            List<string> results = new List<string>();
 
             foreach(var v in businesses)
             {
                 var name = v.SelectToken("name",true);
                 var url = v.SelectToken("mobile_url", true);
                 var result = name + " " + url;
-                SingleService.ReplyTo(reply.ScreenName, result);
-                Console.WriteLine("name {0} URL {1} \n", name,url);
+                results.Add(result);
             }
-            
-
-            if (businesses.Count == 0)
-            {
-                Console.WriteLine("No businesses for {0} in {1} found.", term, location);
-                return;
-            }
-
-            string business_id = (string)businesses[0]["id"];
-
-            Console.WriteLine(
-                "{0} businesses found, querying business info for the top result \"{1}\"...",
-                businesses.Count,
-                business_id
-            );
-
-            response = client.GetBusiness(business_id);
-
-            //Console.WriteLine(String.Format("Result for business {0} found:", business_id));        
-            //Console.WriteLine(response.ToString());
+            return results;
         }
+
+        ///search restaurant and reply resukts.
+        ///
+
+        public static void SearchRestAndReply(CoreTweet.Status reply)
+        {
+            string text = reply.Text;
+            string[] locTerm = text.Split(' ');
+            string loc = locTerm[1];
+            string term = locTerm[2];
+            List<string> results = QueryAPIAndPrintResult(term, loc);
+            foreach (string res in results)
+            {
+                SingleService.ReplyTo(reply.InReplyToScreenName, res);
+            }
+        }
+
 
         /// <summary>
         /// Program entry point.
@@ -229,17 +233,12 @@ namespace YelpAPI
         /// <param name="args">The command-line arguments.</param>
         static void Main(string[] args)
         {
-            var options = new Options();
-
             try
             {
-                List<PairOfLocTerm> replies = SingleService.getOAuthAndReplies();
+                MapAPI.getCordinate("上尾");
+                List<CoreTweet.Status> replies =  SingleService.getOAuthAndReplies();
+                SearchRestAndReply(replies[0]);
 
-                PairOfLocTerm reply = replies[0];
-
-                options.Term = reply.Term;
-                options.Location = reply.Loc;
-                QueryAPIAndPrintResult(reply,options.Term, options.Location);
                 Console.ReadLine();
 
             }
